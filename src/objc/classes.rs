@@ -16,7 +16,7 @@ use super::{
     IMP, SEL,
 };
 use crate::mach_o::MachO;
-use crate::mem::{guest_size_of, ConstPtr, ConstVoidPtr, GuestUSize, Mem, Ptr, SafeRead};
+use crate::mem::{guest_size_of, ConstPtr, ConstVoidPtr, GuestUSize, Mem, Ptr, SafeRead, MutVoidPtr};
 use std::collections::{HashMap, VecDeque};
 
 /// Generic pointer to an Objective-C class or metaclass.
@@ -1279,4 +1279,27 @@ pub fn objc_release(env: &mut crate::Environment, obj: id) -> id {
         crate::objc::release(env, obj);
     }
     obj
+}
+
+/// Personality routine для обработки исключений Objective-C.
+/// Вызывается системой при возникновении `@throw`.
+pub fn ___objc_personality_v0(
+    _env: &mut crate::Environment,
+    version: i32,
+    actions: i32,
+    exception_class: u64,
+    exception_object: MutVoidPtr,
+    context: MutVoidPtr,
+) -> i32 {
+    // Выводим детальную информацию об исключении в лог
+    log!(
+        "___objc_personality_v0 called! Exception handling is not fully implemented in touchHLE.\n\
+        version: {}, actions: {}, class: {:x}, object: {:?}, context: {:?}",
+        version, actions, exception_class, exception_object, context
+    );
+    
+    // Согласно C++ ABI для ARM, функция должна вернуть _Unwind_Reason_Code.
+    // 3 = _URC_FATAL_PHASE1_ERROR (критическая ошибка при поиске обработчика).
+    // Это честное поведение системы, когда она не может безопасно размотать стек.
+    3
 }

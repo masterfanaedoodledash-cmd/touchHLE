@@ -1,19 +1,19 @@
 /*
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Эта лицензия Source Code Form подпадает под условия Mozilla Public
+ * License, v. 2.0. Если копия MPL не распространялась вместе с этим
+ * файлом, вы можете получить ее на https://mozilla.org/MPL/2.0/.
  */
 //! The Audio Toolbox framework.
 
 use crate::audio::openal::{OpenAL, OpenALContext, OpenALManager};
 
-/// Macro for checking if an argument is null and returning `paramErr` if so.
-/// This seems to be what the real Audio Toolbox does, and some apps rely on it.
+/// Макрос для проверки, является ли аргумент null, и возврата `paramErr` в этом случае.
+/// Похоже, это именно то, что делает настоящий Audio Toolbox, и некоторые приложения полагаются на это.
 macro_rules! return_if_null {
     ($param:ident) => {
         if $param.is_null() {
             log_dbg!(
-                "Got NULL parameter {}, returning paramErr in {} on line {}",
+                "Получен параметр NULL {}, возвращаем paramErr в {} на строке {}",
                 stringify!($param),
                 file!(),
                 line!()
@@ -81,7 +81,7 @@ impl LazyALContext {
     pub fn get_context(&mut self, manager: &mut OpenALManager) -> &mut OpenALContext {
         if self.0.is_none() {
             let context = OpenALContext::new(manager).unwrap();
-            log_dbg!("New internal OpenAL context ({:?})", context);
+            log_dbg!("Новый внутренний контекст OpenAL ({:?})", context);
             self.0 = Some(context);
         }
         self.0.as_mut().unwrap()

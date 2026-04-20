@@ -183,4 +183,5 @@ const FUNCTIONS: FunctionExports = &[
     export_c_func!(method_setImplementation(_, _)),
     export_c_func!(method_getTypeEncoding(_, _)),
     export_c_func!(_Block_object_dispose(_, _)),
+    export_c_func!(___objc_personality_v0(_, _, _, _, _, _)),
 ];

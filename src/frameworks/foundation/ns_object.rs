@@ -20,10 +20,8 @@ use crate::objc::{
     autorelease, id, msg, msg_class, msg_send, msg_send_no_type_checking, nil, objc_classes,
     retain, Class, ClassExports, NSZonePtr, ObjC, TrivialHostObject, SEL,
 };
-
 // Хранилище для отмененных таймеров (target, имя селектора в виде строки)
 pub static mut CANCELLED_PERFORMS: std::vec::Vec<(u32, std::option::Option<std::string::String>)> = std::vec::Vec::new();
-
 // ДОБАВЛЕНА РЕАЛИЗАЦИЯ NSAllocateObject
 fn NSAllocateObject(
     env: &mut Environment,
@@ -36,14 +34,14 @@ fn NSAllocateObject(
     }
     
     // Перенаправляем вызов в стандартный метод alloc данного класса
-    msg![env; class alloc]
+    msg![env;
+class alloc]
 }
 
 // ДОБАВЛЕН ЭКСПОРТ ФУНКЦИЙ ДЛЯ ДИНАМИЧЕСКОГО ЛИНКЕРА
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(NSAllocateObject(_, _, _)),
 ];
-
 pub const CLASSES: ClassExports = objc_classes! {
 
 (env, this, _cmd);
@@ -51,16 +49,18 @@ pub const CLASSES: ClassExports = objc_classes! {
 @implementation NSObject
 
 + (id)alloc {
-    msg![env; this allocWithZone:(MutVoidPtr::null())]
+    msg![env;
+this allocWithZone:(MutVoidPtr::null())]
 }
 + (id)allocWithZone:(NSZonePtr)_zone { 
     log_dbg!("[{:?} allocWithZone:]", this);
-    env.objc.alloc_object(this, Box::new(TrivialHostObject), &mut env.mem)
+env.objc.alloc_object(this, Box::new(TrivialHostObject), &mut env.mem)
 }
 
 + (id)new {
     let new_object: id = msg![env; this alloc];
-    msg![env; new_object init]
+    msg![env;
+new_object init]
 }
 
 + (Class)class {
@@ -89,13 +89,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 + (u32)instanceMethodForSelector:(SEL)selector {
     // Разделяем заимствования (borrows) чтобы компилятор Rust был счастлив
     let dyld = &mut env.dyld;
-    let mem = &mut env.mem;
+let mem = &mut env.mem;
     let cpu = &mut env.cpu;
-    match dyld.create_proc_address(mem, cpu, "_objc_msgSend") {
+match dyld.create_proc_address(mem, cpu, "_objc_msgSend") {
         Ok(guest_func) => guest_func.addr_with_thumb_bit(),
         Err(_) => {
             log!("Error: _objc_msgSend not found! Returning dummy IMP.");
-            let ptr: crate::mem::MutPtr<u16> = mem.alloc(2).cast();
+let ptr: crate::mem::MutPtr<u16> = mem.alloc(2).cast();
             mem.write(ptr, 0x4770);
             ptr.to_bits() | 1
         }
@@ -103,13 +103,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 + (id)instanceMethodSignatureForSelector:(SEL)selector {
-    let sig: id = msg_class![env; NSMethodSignature signatureWithObjCTypes:(MutVoidPtr::null())];
+    let sig: id = msg_class![env;
+NSMethodSignature signatureWithObjCTypes:(MutVoidPtr::null())];
     
     let sel_str = selector.as_str(&env.mem);
     let explicit_args = sel_str.chars().filter(|&c| c == ':').count() as NSUInteger;
-    let total_args = explicit_args + 2;
+let total_args = explicit_args + 2;
     () = msg![env; sig _touchHLE_setNumberOfArguments:total_args];
-    sig
+sig
 }
 
 + (bool)accessInstanceVariablesDirectly {
@@ -119,27 +120,28 @@ pub const CLASSES: ClassExports = objc_classes! {
 // Методы класса
 + (id)description {
     let name = env.objc.get_class_name(this);
-    let str = from_rust_string(env, name.to_string());
+let str = from_rust_string(env, name.to_string());
     autorelease(env, str)
 }
 
 + (id)debugDescription {
-    msg![env; this description]
+    msg![env;
+this description]
 }
 
 + (())cancelPreviousPerformRequestsWithTarget:(id)target
                                      selector:(SEL)selector
                                        object:(id)object {
     let sel_str = selector.as_str(&env.mem).to_string();
-    unsafe {
+unsafe {
         crate::frameworks::foundation::ns_object::CANCELLED_PERFORMS.push((target.to_bits(), Some(sel_str)));
-    }
+}
 }
 
 + (())cancelPreviousPerformRequestsWithTarget:(id)target {
     unsafe {
         crate::frameworks::foundation::ns_object::CANCELLED_PERFORMS.push((target.to_bits(), None));
-    }
+}
 }
 
 - (id)init {
@@ -148,16 +150,18 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 // ИСПРАВЛЕНИЕ: Добавлены методы ЭКЗЕМПЛЯРА description и debugDescription
 - (id)description {
-    let class: Class = msg![env; this class];
+    let class: Class = msg![env;
+this class];
     let name = env.objc.get_class_name(class);
     // Формируем классическую строку вида <ClassName: 0xAddress>
     let desc_str = format!("<{}: 0x{:x}>", name, this.to_bits());
-    let str = from_rust_string(env, desc_str);
+let str = from_rust_string(env, desc_str);
     autorelease(env, str)
 }
 
 - (id)debugDescription {
-    msg![env; this description]
+    msg![env;
+this description]
 }
 
 - (NSUInteger)retainCount {
@@ -167,17 +171,18 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)retain {
     log_dbg!("[{:?} retain]", this);
     env.objc.increment_refcount(this);
-    this
+this
 }
 - (())release {
     log_dbg!("[{:?} release]", this);
     if env.objc.decrement_refcount(this) {
-        () = msg![env; this dealloc];
+        () = msg![env;
+this dealloc];
     }
 }
 - (id)autorelease {
     () = msg_class![env; NSAutoreleasePool addObject:this];
-    this
+this
 }
 
 - (())dealloc {
@@ -189,12 +194,13 @@ pub const CLASSES: ClassExports = objc_classes! {
     ObjC::read_isa(this, &env.mem)
 }
 - (bool)isMemberOfClass:(Class)class {
-    let this_class: Class = msg![env; this class];
+    let this_class: Class = msg![env;
+this class];
     class == this_class
 }
 - (bool)isKindOfClass:(Class)class {
     let this_class: Class = msg![env; this class];
-    env.objc.class_is_subclass_of(this_class, class)
+env.objc.class_is_subclass_of(this_class, class)
 }
 
 - (NSUInteger)hash {
@@ -206,7 +212,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)copy {
-    msg![env; this copyWithZone:(MutVoidPtr::null())]
+    msg![env;
+this copyWithZone:(MutVoidPtr::null())]
 }
 
 - (id)mutableCopy {
@@ -216,74 +223,74 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setValue:(id)value forKey:(id)key {
     if key == nil {
         log_dbg!("setValue:forKey: — key is nil, ignored");
-        return;
+return;
     }
 
     let key_string = to_rust_string(env, key);
-
-    // Guard: key must be non-empty and ASCII for the camel-case transform.
-    if key_string.is_empty() || !key_string.is_ascii() {
+// Guard: key must be non-empty and ASCII for the camel-case transform.
+    if key_string.is_empty() ||
+!key_string.is_ascii() {
         log!("Warning: setValue:forKey: key {:?} is empty or non-ASCII — calling setValue:forUndefinedKey:", key_string);
-        let sel = env.objc.lookup_selector("setValue:forUndefinedKey:").unwrap();
+let sel = env.objc.lookup_selector("setValue:forUndefinedKey:").unwrap();
         let _: () = msg_send(env, (this, sel, value, key));
         return;
-    }
+}
 
     let camel_case_key_string = format!(
         "{}{}",
         key_string.as_bytes()[0].to_ascii_uppercase() as char,
         &key_string[1..]
     );
-
-    let class = msg![env; this class];
+let class = msg![env; this class];
 
     // If value is nil, call setNilValueForKey: instead of trying to
     // pass nil to a typed setter (which would previously hit the assert).
-    if value == nil {
+if value == nil {
         log_dbg!("setValue:forKey: value is nil for key {:?} — calling setNilValueForKey:", key_string);
-        if let Some(sel) = env.objc.lookup_selector(&format!("set{camel_case_key_string}:")) {
+if let Some(sel) = env.objc.lookup_selector(&format!("set{camel_case_key_string}:")) {
             if env.objc.class_has_method(class, sel) {
                 let _: () = msg_send(env, (this, sel, value));
-                return;
+return;
             }
         }
         let sel = env.objc.lookup_selector("setNilValueForKey:").unwrap();
-        let _: () = msg_send(env, (this, sel, key));
+let _: () = msg_send(env, (this, sel, key));
         return;
     }
 
     // If value is an NSValue (boxed scalar), allow it through — the assert
-    // was too strict. Real KVC sometimes boxes CGRect/CGPoint etc. in NSValue.
+    // was too strict.
+// Real KVC sometimes boxes CGRect/CGPoint etc. in NSValue.
     let value_class = msg![env; value class];
     let ns_value_class = env.objc.get_known_class("NSValue", &mut env.mem);
-    if env.objc.class_is_subclass_of(value_class, ns_value_class) {
+if env.objc.class_is_subclass_of(value_class, ns_value_class) {
         log_dbg!(
             "setValue:forKey: value {:?} is NSValue subclass for key {:?} — proceeding",
             value, key_string
         );
-        // Fall through to setter lookup — let the setter handle unboxing.
+// Fall through to setter lookup — let the setter handle unboxing.
     }
 
     // Try setFoo: setter.
-    if let Some(sel) = env.objc.lookup_selector(&format!("set{camel_case_key_string}:")) {
+if let Some(sel) = env.objc.lookup_selector(&format!("set{camel_case_key_string}:")) {
         if env.objc.class_has_method(class, sel) {
             let _: () = msg_send(env, (this, sel, value));
-            return;
+return;
         }
     }
 
     // Try _setFoo: private setter.
-    if let Some(sel) = env.objc.lookup_selector(&format!("_set{camel_case_key_string}:")) {
+if let Some(sel) = env.objc.lookup_selector(&format!("_set{camel_case_key_string}:")) {
         if env.objc.class_has_method(class, sel) {
             let _: () = msg_send(env, (this, sel, value));
-            return;
+return;
         }
     }
 
     // Direct ivar access if the class allows it.
-    let access_sel = env.objc.lookup_selector("accessInstanceVariablesDirectly").unwrap();
+let access_sel = env.objc.lookup_selector("accessInstanceVariablesDirectly").unwrap();
     let access_ivars: bool = msg_send(env, (class, access_sel));
-    if access_ivars {
+if access_ivars {
         if let Some(ivar_ptr) = env.objc
             .object_lookup_ivar(&env.mem, this, &format!("_{key_string}"))
             .or_else(|| env.objc.object_lookup_ivar(&env.mem, this, &format!("_is{camel_case_key_string}")))
@@ -291,13 +298,13 @@ pub const CLASSES: ClassExports = objc_classes! {
             .or_else(|| env.objc.object_lookup_ivar(&env.mem, this, &format!("is{camel_case_key_string}")))
         {
             retain(env, value);
-            env.mem.write(ivar_ptr.cast(), value);
+env.mem.write(ivar_ptr.cast(), value);
             return;
         }
     }
 
     // Fall through to undefined key handler.
-    let undef_sel = env.objc.lookup_selector("setValue:forUndefinedKey:").unwrap();
+let undef_sel = env.objc.lookup_selector("setValue:forUndefinedKey:").unwrap();
     let _: () = msg_send(env, (this, undef_sel, value, key));
 }
 
@@ -305,7 +312,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setValue:(id)_value forUndefinedKey:(id)key { 
     let class: Class = ObjC::read_isa(this, &env.mem);
     let class_name_string = env.objc.get_class_name(class).to_owned();
-    let key_string = to_rust_string(env, key);
+let key_string = to_rust_string(env, key);
     log!("Warning: Object {:?} of class {:?} does not have a setter for {} — ignoring",
         this, class_name_string, key_string);
 }
@@ -322,13 +329,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (u32)methodForSelector:(SEL)selector {
     // Разделяем заимствования (borrows) чтобы компилятор Rust был счастлив
     let dyld = &mut env.dyld;
-    let mem = &mut env.mem;
+let mem = &mut env.mem;
     let cpu = &mut env.cpu;
-    match dyld.create_proc_address(mem, cpu, "_objc_msgSend") {
+match dyld.create_proc_address(mem, cpu, "_objc_msgSend") {
         Ok(guest_func) => guest_func.addr_with_thumb_bit(),
         Err(_) => {
             log!("Error: _objc_msgSend not found! Returning dummy IMP.");
-            let ptr: crate::mem::MutPtr<u16> = mem.alloc(2).cast();
+let ptr: crate::mem::MutPtr<u16> = mem.alloc(2).cast();
             mem.write(ptr, 0x4770);
             ptr.to_bits() | 1
         }
@@ -336,28 +343,29 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)methodSignatureForSelector:(SEL)selector {
-    let sig: id = msg_class![env; NSMethodSignature signatureWithObjCTypes:(MutVoidPtr::null())];
+    let sig: id = msg_class![env;
+NSMethodSignature signatureWithObjCTypes:(MutVoidPtr::null())];
     
     let sel_str = selector.as_str(&env.mem);
     let explicit_args = sel_str.chars().filter(|&c| c == ':').count() as NSUInteger;
-    let total_args = explicit_args + 2;
+let total_args = explicit_args + 2;
     () = msg![env; sig _touchHLE_setNumberOfArguments:total_args];
-    sig
+sig
 }
     
 - (id)performSelector:(SEL)sel {
     assert!(!sel.is_null());
-    msg_send_no_type_checking(env, (this, sel))
+msg_send_no_type_checking(env, (this, sel))
 }
 
 - (id)performSelector:(SEL)sel withObject:(id)o1 {
     assert!(!sel.is_null());
-    msg_send_no_type_checking(env, (this, sel, o1))
+msg_send_no_type_checking(env, (this, sel, o1))
 }
 
 - (id)performSelector:(SEL)sel withObject:(id)o1 withObject:(id)o2 {
     assert!(!sel.is_null());
-    msg_send_no_type_checking(env, (this, sel, o1, o2))
+msg_send_no_type_checking(env, (this, sel, o1, o2))
 }
 
 - (())performSelectorInBackground:(SEL)sel withObject:(id)arg {
@@ -366,21 +374,21 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())performSelector:(SEL)sel withObject:(id)arg afterDelay:(NSTimeInterval)delay {
     log_dbg!("performSelector:{} withObject:{:?} afterDelay:{}", sel.as_str(&env.mem), arg, delay);
-    let sel_key: id = get_static_str(env, "SEL");
+let sel_key: id = get_static_str(env, "SEL");
     let sel_str = from_rust_string(env, sel.as_str(&env.mem).to_string());
     let arg_key: id = get_static_str(env, "arg");
-    let dict = dict_from_keys_and_objects(env, &[(sel_key, sel_str), (arg_key, arg)]);
+let dict = dict_from_keys_and_objects(env, &[(sel_key, sel_str), (arg_key, arg)]);
 
     let selector = env.objc.lookup_selector("_touchHLE_timerFireMethod:").unwrap();
     let timer:id = msg_class![env;
-        NSTimer timerWithTimeInterval:delay
+NSTimer timerWithTimeInterval:delay
                                target:this
                              selector:selector
                              userInfo:dict
-                              repeats:false
+          
+                     repeats:false
     ];
-    
-    let run_loop: id = msg_class![env; NSRunLoop mainRunLoop];
+let run_loop: id = msg_class![env; NSRunLoop mainRunLoop];
     let mode: id = get_static_str(env, NSDefaultRunLoopMode);
     () = msg![env; run_loop addTimer:timer forMode:mode];
 }
@@ -388,10 +396,19 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())performSelectorOnMainThread:(SEL)sel
                        withObject:(id)arg
                     waitUntilDone:(bool)wait {
+    let sel_name = sel.as_str(&env.mem);
+
+    // ОБЩАЯ ЗАГЛУШКА ДЛЯ ВИДЕО: Видео в эмуляторе пока не реализовано
+    // Игнорируем типичные вызовы воспроизведения видео для всех игр
+    if sel_name == "play" || sel_name == "startMovie:" || sel_name == "stopMovie:" || sel_name == "stopMovie" || sel_name == "moviePlayerInit:" || sel_name == "loadMovie:" {
+        log!("Warning: Video playback is not implemented. Stubbing performSelectorOnMainThread:SEL({})", sel_name);
+        return;
+    }
+
     // If we're already on the main thread, execute immediately regardless
     // of wait flag — this is correct and avoids scheduling overhead.
     if env.current_thread == 0 {
-        if sel.as_str(&env.mem).ends_with(':') {
+        if sel_name.ends_with(':') {
             () = msg_send(env, (this, sel, arg));
         } else {
             () = msg_send(env, (this, sel));
@@ -400,46 +417,23 @@ pub const CLASSES: ClassExports = objc_classes! {
     }
 
     // ORIGINAL UPSTREAM FIXES (GAMELOFT HACKS):
-    if env.bundle.bundle_identifier().starts_with("com.gameloft.POP") && (sel == env.objc.lookup_selector("startMovie:").unwrap() || sel == env.objc.lookup_selector("stopMovie").unwrap()) && wait {
-        log!("Applying game-specific hack for PoP: WW: ignoring performSelectorOnMainThread:SEL({}) waitUntilDone:true", sel.as_str(&env.mem));
-        return;
-    }
-    if env.bundle.bundle_identifier().starts_with("com.gameloft.Asphalt5") && (sel == env.objc.lookup_selector("startMovie:").unwrap() || sel == env.objc.lookup_selector("stopMovie:").unwrap()) && wait {
-        log!("Applying game-specific hack for Asphalt5: ignoring performSelectorOnMainThread:SEL({}) waitUntilDone:true", sel.as_str(&env.mem));
-        return;
-    }
-    if env.bundle.bundle_identifier().starts_with("com.gameloft.SplinterCell") && sel == env.objc.lookup_selector("startMovie:").unwrap() && wait {
-        log!("Applying game-specific hack for SplinterCell: ignoring performSelectorOnMainThread:SEL({}) waitUntilDone:true", sel.as_str(&env.mem));
-        return;
-    }
-    if env.bundle.bundle_identifier().starts_with("com.gameloft.AssassinsCreed") && sel == env.objc.lookup_selector("moviePlayerInit:").unwrap() && wait {
-        log!("Applying game-specific hack for AssassinsCreed: ignoring performSelectorOnMainThread:SEL(moviePlayerInit:) waitUntilDone:true");
-        return;
-    }
     if env.bundle.bundle_identifier().starts_with("com.gameloft.Ferrari") && wait {
-        if sel == env.objc.lookup_selector("startMovie:").unwrap() {
-            log!("Applying game-specific hack for Ferrari GT: ignoring performSelectorOnMainThread:SEL({}) waitUntilDone:true", sel.as_str(&env.mem));
-            return;
-        }
-        if sel == env.objc.lookup_selector("initTextInput:").unwrap() || sel == env.objc.lookup_selector("removeTextField:").unwrap() {
-            log!("Applying game-specific hack for Ferrari GT: performing performSelectorOnMainThread:SEL({}) waitUntilDone:true on thread {}", sel.as_str(&env.mem), env.current_thread);
+        if sel == env.objc.lookup_selector("initTextInput:").unwrap() ||
+           sel == env.objc.lookup_selector("removeTextField:").unwrap() {
+            log!("Applying game-specific hack for Ferrari GT: performing performSelectorOnMainThread:SEL({}) waitUntilDone:true on thread {}", sel_name, env.current_thread);
             () = msg_send(env, (this, sel, arg));
             return;
         }
     }
+    
     if env.bundle.bundle_identifier().starts_with("com.gameloft.HOS2") && wait {
-        if sel == env.objc.lookup_selector("loadMovie:").unwrap() || sel == env.objc.lookup_selector("sendGameInfo").unwrap() || sel == env.objc.lookup_selector("setStatusBar:").unwrap() {
-            log!("Applying game-specific hack for HOS2: performing performSelectorOnMainThread:SEL({}) waitUntilDone:true on thread {}", sel.as_str(&env.mem), env.current_thread);
-            if sel.as_str(&env.mem).ends_with(':') {
+        if sel == env.objc.lookup_selector("sendGameInfo").unwrap() || sel == env.objc.lookup_selector("setStatusBar:").unwrap() {
+            log!("Applying game-specific hack for HOS2: performing performSelectorOnMainThread:SEL({}) waitUntilDone:true on thread {}", sel_name, env.current_thread);
+            if sel_name.ends_with(':') {
                 () = msg_send(env, (this, sel, arg));
             } else {
-                // assert!(arg.is_null()); // В форке мы не делаем strict-проверку для совместимости
                 () = msg_send(env, (this, sel));
             }
-            return;
-        }
-        if sel == env.objc.lookup_selector("startMovie:").unwrap() || sel == env.objc.lookup_selector("stopMovie:").unwrap() {
-            log!("Applying game-specific hack for HOS2: ignoring performSelectorOnMainThread:SEL({}) waitUntilDone:true", sel.as_str(&env.mem));
             return;
         }
     }
@@ -450,41 +444,41 @@ pub const CLASSES: ClassExports = objc_classes! {
     // we schedule without waiting and log once at debug level.
     log_dbg!(
         "performSelectorOnMainThread:{} from background thread {} (wait={}) — scheduling",
-        sel.as_str(&env.mem), env.current_thread, wait
+        sel_name, env.current_thread, wait
     );
     msg![env; this performSelector:sel withObject:arg afterDelay:0.0]
 }
 
 - (())_touchHLE_timerFireMethod:(id)which { 
     let dict: id = msg![env; which userInfo];
-    let sel_key: id = get_static_str(env, "SEL");
+let sel_key: id = get_static_str(env, "SEL");
     let sel_str_id: id = msg![env; dict objectForKey:sel_key];
     let sel_str = to_rust_string(env, sel_str_id);
-    let sel = env.objc.lookup_selector(&sel_str).unwrap();
+let sel = env.objc.lookup_selector(&sel_str).unwrap();
 
     let arg_key: id = get_static_str(env, "arg");
     let arg: id = msg![env; dict objectForKey:arg_key];
-    let target_bits = this.to_bits();
+let target_bits = this.to_bits();
     let mut cancelled = false;
     
     unsafe {
         if let Some(pos) = crate::frameworks::foundation::ns_object::CANCELLED_PERFORMS.iter().position(|x| x.0 == target_bits && x.1.as_deref() == Some(sel_str.as_ref())) {
             crate::frameworks::foundation::ns_object::CANCELLED_PERFORMS.remove(pos);
-            cancelled = true;
+cancelled = true;
         } else if let Some(_) = crate::frameworks::foundation::ns_object::CANCELLED_PERFORMS.iter().position(|x| x.0 == target_bits && x.1.is_none()) {
             cancelled = true;
-        }
+}
     }
 
     if cancelled {
         return;
-    }
+}
 
     if sel.as_str(&env.mem).ends_with(':') {
         () = msg_send(env, (this, sel, arg));
-    } else {
+} else {
         () = msg_send(env, (this, sel));
-    }
+}
 }
 
 - (())awakeFromNib {
@@ -492,30 +486,30 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())performSelector:(SEL)sel onThread:(id)_thread withObject:(id)arg waitUntilDone:(bool)_wait {
     log_dbg!("performSelector:{} onThread:withObject:waitUntilDone: — scheduling on main thread instead", sel.as_str(&env.mem));
-    msg![env; this performSelector:sel withObject:arg afterDelay:0.0]
+msg![env; this performSelector:sel withObject:arg afterDelay:0.0]
 }
 
 - (())performSelector:(SEL)sel onThread:(id)_thread withObject:(id)arg waitUntilDone:(bool)_wait modes:(id)_modes {
     log_dbg!("performSelector:{} onThread:withObject:waitUntilDone:modes: — scheduling on main thread instead", sel.as_str(&env.mem));
-    msg![env; this performSelector:sel withObject:arg afterDelay:0.0]
+msg![env; this performSelector:sel withObject:arg afterDelay:0.0]
 }
 
 - (id)valueForKey:(id)key {
     let key_str = super::ns_string::to_rust_string(env, key);
     let sel_name = key_str.to_string();
-    if let Some(sel) = env.objc.lookup_selector(&sel_name) {
+if let Some(sel) = env.objc.lookup_selector(&sel_name) {
         if env.objc.object_has_method(&env.mem, this, sel) {
             return msg_send(env, (this, sel));
-        }
+}
     }
     let is_sel_name = format!("is{}{}", &key_str[..1].to_uppercase(), &key_str[1..]);
-    if let Some(sel) = env.objc.lookup_selector(&is_sel_name) {
+if let Some(sel) = env.objc.lookup_selector(&is_sel_name) {
         if env.objc.object_has_method(&env.mem, this, sel) {
             return msg_send(env, (this, sel));
-        }
+}
     }
     log!("Warning: valueForKey:{} not found on {:?} — returning nil", key_str, this);
-    nil
+nil
 }
 
 - (id)valueForKeyPath:(id)key_path {
@@ -523,7 +517,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())setValue:(id)value forKeyPath:(id)key_path {
-    msg![env; this setValue:value forKey:key_path]
+    msg![env;
+this setValue:value forKey:key_path]
 }
 
 // MARK: - Key-Value Observing (KVO)
@@ -537,7 +532,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 // Закомментировано: 'self' является зарезервированным словом в Rust и не может 
-// быть использовано как имя метода в этом макросе. Рантайм Objective-C справится с ним сам.
+// быть использовано как имя метода в этом макросе.
+// Рантайм Objective-C справится с ним сам.
 // - (id)self { ... }
 
 - (NSUInteger)version {
@@ -563,3 +559,4 @@ pub const CLASSES: ClassExports = objc_classes! {
 @end
 
 };
+

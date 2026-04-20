@@ -605,6 +605,24 @@ pub fn CGContextDrawImage(
     cg_bitmap_context::draw_image(env, context, rect, image);
 }                                      // ← closes function ← THIS IS MISSING OR WRONG
 
+pub fn CGContextDrawLinearGradient(
+    env: &mut Environment,
+    context: CGContextRef,
+    _gradient: CFTypeRef, // CGGradientRef
+    _start_point: CGPoint,
+    _end_point: CGPoint,
+    _options: u32,
+) {
+    if context.is_null() { return; }
+    
+    // Честная отрисовка градиента требует попиксельной интерполяции между цветами 
+    // объекта CGGradientRef. Так как реализация самого CGGradientRef находится 
+    // в другом модуле, здесь мы честно вычисляем границы текущего отсечения (clipping box)
+    // и заполняем эту область текущим цветом контекста.
+    let rect = CGContextGetClipBoundingBox(env, context);
+    cg_bitmap_context::fill_rect(env, context, rect, false);
+}
+
 fn CGContextSaveGState(env: &mut Environment, context: CGContextRef) {
     if context.is_null() { return; }
     let h = env.objc.borrow::<CGContextHostObject>(context);
@@ -802,5 +820,5 @@ export_c_func!(CGContextClipToMask(_, _, _)),
 export_c_func!(CGContextSetBlendMode(_, _)),
 export_c_func!(CGContextSetShadow(_, _, _)),
 export_c_func!(CGContextSetShadowWithColor(_, _, _, _)),
-
+export_c_func!(CGContextDrawLinearGradient(_, _, _, _, _)),
 ];

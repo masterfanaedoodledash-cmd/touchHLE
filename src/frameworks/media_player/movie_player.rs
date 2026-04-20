@@ -74,6 +74,7 @@ pub const CONSTANTS: ConstantExports = &[
     (
         "_MPMoviePlayerPlaybackDidFinishReasonUserInfoKey",
         HostConstant::NSString(MPMoviePlayerPlaybackDidFinishReasonUserInfoKey),
+   
     ),
 ];
 
@@ -147,6 +148,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         source_type: 0,
         repeat_mode: 0,
         should_autoplay: true,
+    
         initial_playback_time: -1.0,
         playback_state: MPMoviePlaybackStateStopped,
     });
@@ -160,6 +162,9 @@ pub const CLASSES: ClassExports = objc_classes! {
         url,
         ns_url::to_rust_path(env, url),
     );
+    
+    // Инициализируем сам объект
+    let this: id = msg![env; this init];
     retain(env, url);
 
     {
@@ -170,7 +175,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     // Ensure views exist immediately
     ensure_view(env, this);
     ensure_background_view(env, this);
-
+    
     // Act as if loading immediately completed (Spore Origins waits for this).
     // Retain this so the object stays alive until handle_players fires.
     retain(env, this);
@@ -179,6 +184,17 @@ pub const CLASSES: ClassExports = objc_classes! {
         this,
         Instant::now(),
     ));
+
+    // ХАК ДЛЯ ЗАГЛУШКИ: Автоматически завершаем видео через 150мс.
+    // Если игра не может вызвать `play` (например, из-за наших заглушек в ns_object),
+    // этот код все равно сымитирует конец видеоролика, чтобы игра загрузила главное меню.
+    retain(env, this);
+    State::get(env).pending_notifications.push_back((
+        MPMoviePlayerPlaybackDidFinishNotification,
+        this,
+        Instant::now() + std::time::Duration::from_millis(150),
+    ));
+
     this
 }
 
@@ -211,7 +227,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (id)backgroundColor {
-    msg_class![env; UIColor blackColor] // TODO
+    msg_class![env;
+UIColor blackColor] // TODO
 }
 - (())setBackgroundColor:(id)color { // UIColor*
     todo_objc_setter!(this, color);
@@ -384,16 +401,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 // MPMediaPlayback implementation
 - (())play {
     log!("TODO: [(MPMoviePlayerController*){:?} play]", this);
-
     env.objc
         .borrow_mut::<MPMoviePlayerControllerHostObject>(this)
         .playback_state = MPMoviePlaybackStatePlaying;
-
     // Retain this so the object stays alive until handle_players fires and
-    // we release it after posting the notification. Without the retain, if
-    // the game releases the player immediately after calling play() the
-    // object may be freed before handle_players runs, causing a
-    // use-after-free (manifests as NULL-PAGE READ at 0x10).
+    // we release it after posting the notification.
     retain(env, this);
     State::get(env).pending_notifications.push_back((
         MPMoviePlayerPlaybackDidFinishNotification,
@@ -411,11 +423,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())stop {
     log!("TODO: [(MPMoviePlayerController*){:?} stop]", this);
-
     env.objc
         .borrow_mut::<MPMoviePlayerControllerHostObject>(this)
         .playback_state = MPMoviePlaybackStateStopped;
-
     if env
         .framework_state
         .media_player
@@ -446,7 +456,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 @end
 
 };
-
 /// For use by `NSRunLoop` via [super::handle_players]: check movie players'
 /// status, send notifications if necessary.
 pub(super) fn handle_players(env: &mut Environment) {
@@ -474,15 +483,16 @@ pub(super) fn handle_players(env: &mut Environment) {
 
         let name = ns_string::get_static_str(env, name_str);
         let center: id = msg_class![env; NSNotificationCenter defaultCenter];
-
         if name_str == MPMoviePlayerPlaybackDidFinishNotification {
             // Many apps (including NFSU) read
             // MPMoviePlayerPlaybackDidFinishReasonUserInfoKey from the
-            // notification's userInfo. Without it the game dereferences nil
+            // notification's userInfo.
+            // Without it the game dereferences nil
             // at offset 0x10, causing a NULL-PAGE READ crash.
             // MPMovieFinishReasonPlaybackEnded = 0
             let reason_num: id =
-                msg_class![env; NSNumber numberWithInt:0i32];
+                msg_class![env;
+NSNumber numberWithInt:0i32];
             let reason_key = ns_string::get_static_str(
                 env,
                 MPMoviePlayerPlaybackDidFinishReasonUserInfoKey,
@@ -492,9 +502,11 @@ pub(super) fn handle_players(env: &mut Environment) {
                 forKey:reason_key];
             let _: () = msg![env; center postNotificationName:name
                                                        object:object
-                                                     userInfo:user_info];
+                                       
+              userInfo:user_info];
         } else {
-            let _: () = msg![env; center postNotificationName:name
+            let _: () = msg![env;
+center postNotificationName:name
                                                        object:object];
         }
 

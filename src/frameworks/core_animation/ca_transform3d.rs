@@ -173,6 +173,11 @@ impl CATransform3D {
         Matrix::<4>::multiply(&a, &b).into()
     }
 
+    pub fn rotate(self, angle: CGFloat, x: CGFloat, y: CGFloat, z: CGFloat) -> Self {
+        let rot_mat = Self::make_rotation(angle, x, y, z);
+        rot_mat.concat(self)
+    }
+    
     pub fn scale(self, sx: CGFloat, sy: CGFloat, sz: CGFloat) -> Self {
         let scale_mat = Self::make_scale(sx, sy, sz);
         scale_mat.concat(self)
@@ -195,10 +200,14 @@ fn CATransform3DScale(_env: &mut Environment, t: CATransform3D, sx: CGFloat, sy:
     t.scale(sx, sy, sz)
 }
 
+fn CATransform3DRotate(_env: &mut Environment, t: CATransform3D, angle: CGFloat, x: CGFloat, y: CGFloat, z: CGFloat) -> CATransform3D {
+    t.rotate(angle, x, y, z)
+}
+
 pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(CATransform3DMakeTranslation(_, _, _)),
     export_c_func!(CATransform3DMakeScale(_, _, _)),
     export_c_func!(CATransform3DMakeRotation(_, _, _, _)),
-    export_c_func!(CATransform3DScale(_, _, _, _)), // ИСПРАВЛЕНО: 4 аргумента
+    export_c_func!(CATransform3DScale(_, _, _, _)),
+    export_c_func!(CATransform3DRotate(_, _, _, _, _)), // Добавили эту строку (5 аргументов)
 ];
-

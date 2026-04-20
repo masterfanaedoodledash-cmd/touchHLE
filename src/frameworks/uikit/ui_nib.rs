@@ -246,15 +246,18 @@ pub const CLASSES: ClassExports = objc_classes! {
     };
     let object: id = msg![env; selected_class alloc];
 
-    // ИСПРАВЛЕНИЕ: Мы ПЕРЕХВАТЫВАЕМ любые ViewController'ы и базовые объекты.
-    // Если мы вызовем initWithCoder:, игра вызовет [super initWithCoder:],
-    // который в touchHLE отсутствует и вернет NULL, что крашнет гостевую память.
-    let mut init_obj: id = if orig == "UICustomObject" || 
-                              orig == "UIResponder" || 
-                              orig.contains("ViewController") {
-        if orig.contains("ViewController") {
-            log!("[DEBUG NIB] Bypassing initWithCoder: for {} to prevent guest NULL dereference. Using init.", name);
-        }
+    // UICustomObject and UIResponder are placeholder types used by IB that have
+    // no meaningful initWithCoder: — use plain init for those only.
+    //
+    // NOTE: ViewControllers (orig == "UIViewController" or subclasses) must go
+    // through initWithCoder: so that:
+    //   1. The guest's own initWithCoder: runs and sets up guest-side state.
+    //   2. The AppDelegate outlet (setViewController:) properly retains the VC.
+    //   3. startAnimation is called on a live, non-freed object.
+    // The host UIViewController::initWithCoder: now returns `this` safely, so
+    // the old bypass that used plain `init` is no longer needed and was itself
+    // the cause of the use-after-free (nil isa) crash / white screen.
+    let mut init_obj: id = if orig == "UICustomObject" || orig == "UIResponder" {
         msg![env; object init]
     } else {
         msg![env; object initWithCoder:coder]

@@ -215,3 +215,6 @@ com.ea.nfsucinc: --force-composition
 
 # BOF
 com.gameloft.BladesOfFury: --force-composition
+
+# MCPE LITE
+com.mojang.minecraftpe-demo: --force-composition

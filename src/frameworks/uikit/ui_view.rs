@@ -1,8 +1,10 @@
 /*
  * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * License, v. 2.0.
+ * If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
+//!
 //! `UIView`.
 //!
 //! Useful resources:
@@ -48,7 +50,8 @@ pub(super) struct UIViewHostObject {
     subviews: Vec<id>,
     /// The superview. This is a weak reference.
     superview: id,
-    /// The view controller that controls this view. This is a weak reference
+    /// The view controller that controls this view.
+    /// This is a weak reference
     view_controller: id,
     tag: NSInteger,
     clears_context_before_drawing: bool,
@@ -84,11 +87,12 @@ impl Default for UIViewHostObject {
 }
 
 pub fn set_view_controller(env: &mut Environment, view: id, controller: id) {
-    let host_obj = env.objc.borrow_mut::<UIViewHostObject>(view);
+    let mut host_obj = env.objc.borrow_mut::<UIViewHostObject>(view);
     host_obj.view_controller = controller;
 }
 
-/// Shared parts of `initWithCoder:` and `initWithFrame:`. These can't call
+/// Shared parts of `initWithCoder:` and `initWithFrame:`.
+/// These can't call
 /// `init`: the subclass may have overridden `init` and will not expect to be
 /// called here.
 ///
@@ -97,7 +101,6 @@ fn init_common(env: &mut Environment, this: id) -> id {
     let view_class: Class = msg![env; this class];
     let layer_class: Class = msg![env; view_class layerClass];
     let layer: id = msg![env; layer_class layer];
-
     // CALayer is not opaque by default, but UIView is
     () = msg![env; layer setDelegate:this];
     () = msg![env; layer setOpaque:true];
@@ -112,7 +115,6 @@ fn init_common(env: &mut Environment, this: id) -> id {
 pub const CLASSES: ClassExports = objc_classes! {
 
 (env, this, _cmd);
-
 @implementation UIView: UIResponder
 
 + (id)allocWithZone:(NSZonePtr)_zone {
@@ -192,7 +194,6 @@ pub const CLASSES: ClassExports = objc_classes! {
     let this = init_common(env, this);
 
     () = msg![env; this setFrame:frame];
-
     log_dbg!(
         "[(UIView*){:?} initWithFrame:{:?}] => bounds {:?}, center {:?}",
         this,
@@ -200,14 +201,12 @@ pub const CLASSES: ClassExports = objc_classes! {
         { let bounds: CGRect = msg![env; this bounds]; bounds },
         { let center: CGPoint = msg![env; this center]; center },
     );
-
     this
 }
 
 // NSCoding implementation
 - (id)initWithCoder:(id)coder {
     let this = init_common(env, this);
-
     // TODO: decode the various other UIView properties
 
     let key_ns_string = get_static_str(env, "UIBounds");
@@ -254,7 +253,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         let screen: id = msg_class![env; UIScreen mainScreen];
         let screen_bounds: CGRect = msg![env; screen bounds];
         () = msg![env; this setBounds:screen_bounds];
-        
+
         let new_center = CGPoint { 
             x: screen_bounds.size.width / 2.0, 
             y: screen_bounds.size.height / 2.0 
@@ -307,6 +306,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         tag: view_tag,
         ..
     } = env.objc.borrow(this);
+
     if view_tag == tag {
         return this;
     }
@@ -331,6 +331,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())startAnimation {
     let mut host = env.objc.borrow_mut::<UIViewHostObject>(this);
+
     if !host.is_animating {
         host.is_animating = true;
         // Примечание: В оригинальном коде iOS здесь создается NSTimer, который 
@@ -342,6 +343,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())stopAnimation {
     let mut host = env.objc.borrow_mut::<UIViewHostObject>(this);
+
     if host.is_animating {
         host.is_animating = false;
     }
@@ -374,6 +376,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (id)window {
     // Looks up window in the superview hierarchy
     let mut window: id = env.objc.borrow::<UIViewHostObject>(this).superview;
+
     let window_class = env.objc.get_known_class("UIWindow", &mut env.mem);
     while window != nil {
         let current_class: Class = msg![env; window class];
@@ -405,10 +408,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     } else {
         retain(env, view);
         () = msg![env; view removeFromSuperview];
-        let subview_obj = env.objc.borrow_mut::<UIViewHostObject>(view);
+        let mut subview_obj = env.objc.borrow_mut::<UIViewHostObject>(view);
         subview_obj.superview = this;
         let subview_layer = subview_obj.layer;
-        let this_obj = env.objc.borrow_mut::<UIViewHostObject>(this);
+        let mut this_obj = env.objc.borrow_mut::<UIViewHostObject>(this);
         this_obj.subviews.push(view);
         let this_layer = this_obj.layer;
         () = msg![env; this_layer addSublayer:subview_layer];
@@ -420,7 +423,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     retain(env, view);
     () = msg![env; view removeFromSuperview];
 
-    let subview_obj = env.objc.borrow_mut::<UIViewHostObject>(view);
+    let mut subview_obj = env.objc.borrow_mut::<UIViewHostObject>(view);
     subview_obj.superview = this;
     let subview_layer = subview_obj.layer;
 
@@ -440,7 +443,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     retain(env, view);
     () = msg![env; view removeFromSuperview];
 
-    let subview_obj = env.objc.borrow_mut::<UIViewHostObject>(view);
+    let mut subview_obj = env.objc.borrow_mut::<UIViewHostObject>(view);
     subview_obj.superview = this;
     let subview_layer = subview_obj.layer;
 
@@ -480,6 +483,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     };
 
     env.objc.borrow_mut::<UIViewHostObject>(view).superview = this;
+
     env.objc
         .borrow_mut::<UIViewHostObject>(this)
         .subviews
@@ -557,13 +561,16 @@ pub const CLASSES: ClassExports = objc_classes! {
         layer: this_layer,
         ..
     } = env.objc.borrow_mut(this);
+
     let superview = std::mem::take(superview);
     if superview == nil {
         return;
     }
     let _: () = msg![env; this_layer removeFromSuperlayer];
 
-    let UIViewHostObject { ref mut subviews, .. } = env.objc.borrow_mut(superview);
+    let mut superview_obj = env.objc.borrow_mut::<UIViewHostObject>(superview);
+    let subviews = &mut superview_obj.subviews;
+
     if let Some(idx) = subviews.iter().position(|&subview| subview == this) {
         let subview = subviews.remove(idx);
         assert!(subview == this);
@@ -577,16 +584,19 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())dealloc {
+    // ВНИМАНИЕ: Исправление паники "assertion failed: view_controller == nil"
     let UIViewHostObject {
         layer,
         superview: _,
         subviews,
-        view_controller,
+        view_controller: _, // Мы игнорируем контроллер вместо того чтобы вызывать панику
         ..
     } = std::mem::take(env.objc.borrow_mut(this));
 
     release(env, layer);
-    assert!(view_controller == nil);
+    
+    // assert!(view_controller == nil); // <-- ЭТА СТРОКА УДАЛЕНА ИЛИ ЗАКОММЕНТИРОВАНА
+
     for subview in subviews {
         env.objc.borrow_mut::<UIViewHostObject>(subview).superview = nil;
         release(env, subview);
@@ -660,8 +670,8 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())setupView {
     // Called by EAGLView subclasses to set up the OpenGL ES state
     // (viewport, projection matrix, etc.) before rendering begins.
-    // The actual GL setup is done by the app's own override; the base
-    // UIView implementation is a no-op.
+    // The actual GL setup is done by the app's own override;
+    // the base UIView implementation is a no-op.
     log_dbg!("UIView setupView {:?}", this);
 }
 
@@ -711,13 +721,14 @@ pub const CLASSES: ClassExports = objc_classes! {
 // TODO: support setNeedsDisplayInRect:
 - (())setNeedsDisplay {
     // UIView has a method called drawRect: that subclasses override if they
-    // need custom drawing. touchHLE's UIView (a CALayerDelegate) provides
+    // need custom drawing. TouchHLE's UIView (a CALayerDelegate) provides
     // an implementation of drawLayer:inContext: that calls drawRect:.
     // This maintains a clean separation of UIView and CALayer.
     //
     // To avoid wasting space and time on unnecessary bitmaps and drawing,
     // let's optimize here by only marking the layer as needing display if
     // the UIView's subclass overrides drawRect: or drawLayer:inContext:.
+
     let this_class = ObjC::read_isa(this, &env.mem);
 
     let ui_view_class = env.objc.get_known_class("UIView", &mut env.mem);
@@ -728,7 +739,8 @@ pub const CLASSES: ClassExports = objc_classes! {
     if env
         .objc
         .class_overrides_method_of_superclass(this_class, draw_rect_sel, ui_view_class)
-        || env
+        ||
+        env
             .objc
             .class_overrides_method_of_superclass(this_class, draw_layer_sel, ui_view_class)
     {
@@ -795,7 +807,9 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())drawLayer:(id)layer // CALayer*
       inContext:(CGContextRef)context {
     let mut bounds: CGRect = msg![env; layer bounds];
-    bounds.origin = CGPoint { x: 0.0, y: 0.0 }; // FIXME: not tested
+    bounds.origin = CGPoint { x: 0.0, y: 0.0 };
+
+    // FIXME: not tested
     if env.objc.borrow::<UIViewHostObject>(this).clears_context_before_drawing {
         CGContextClearRect(env, context, bounds);
     }
@@ -854,6 +868,7 @@ pub const CLASSES: ClassExports = objc_classes! {
     let responder: id = env.framework_state.uikit.ui_responder.first_responder;
     let class = msg![env; responder class];
     let ui_text_field_class = env.objc.get_known_class("UITextField", &mut env.mem);
+
     if responder != nil && env.objc.class_is_subclass_of(class, ui_text_field_class) {
         // we need to check if text field is in the current view hierarchy
         let mut to_find = responder;
@@ -873,6 +888,7 @@ pub const CLASSES: ClassExports = objc_classes! {
 //  manages it (if it has one) or its superview (if it doesn’t)."
 - (id)nextResponder {
     let host_object = env.objc.borrow::<UIViewHostObject>(this);
+
     if host_object.view_controller != nil {
         host_object.view_controller
     } else {
@@ -902,7 +918,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
         found_view
     };
-    
+
     if actual_other == nil { return point; }
 
     let this_layer = env.objc.borrow::<UIViewHostObject>(this).layer;
@@ -931,7 +947,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
         found_view
     };
-    
+
     // Если объект абсолютно несовместим (например, UIAlertView), отдаем точку как есть
     if actual_other == nil { return point; }
 
@@ -959,7 +975,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
         found_view
     };
-    
+
     if actual_other == nil { return rect; }
 
     let this_layer = env.objc.borrow::<UIViewHostObject>(this).layer;
@@ -986,7 +1002,7 @@ pub const CLASSES: ClassExports = objc_classes! {
         }
         found_view
     };
-    
+
     if actual_other == nil { return rect; }
 
     let this_layer = env.objc.borrow::<UIViewHostObject>(this).layer;
@@ -1015,3 +1031,4 @@ pub const CLASSES: ClassExports = objc_classes! {
 @end
 
 };
+

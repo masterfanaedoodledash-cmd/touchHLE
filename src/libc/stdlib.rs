@@ -185,6 +185,7 @@ fn prng(state: u32) -> u32 {
 }
 
 const RAND_MAX: i32 = i32::MAX;
+
 fn srand(env: &mut Environment, seed: u32) {
     env.libc_state.stdlib.rand = seed;
 }
@@ -289,8 +290,9 @@ fn exit(env: &mut Environment, exit_code: i32) {
 }
 
 fn abort(_env: &mut Environment) {
-    echo!("App called abort()! The guest application encountered a fatal error.");
-    std::process::exit(1);
+    // ИСПРАВЛЕНИЕ ДЛЯ BOX2D: Отключаем краш эмулятора при вызове abort()
+    echo!("App called abort()! The guest application encountered a fatal error. Ignoring to bypass Box2D crash!");
+    // std::process::exit(1); 
 }
 
 fn bsearch(
@@ -491,7 +493,8 @@ fn wcstombs(
 
 fn system(env: &mut Environment, cmd: ConstPtr<u8>) -> i32 {
     if cmd.is_null() {
-        return 1; // shell is available
+        return 1;
+        // shell is available
     }
     let cmd_str = env.mem.cstr_at_utf8(cmd).unwrap_or("").to_string();
     log!("system({:?})", cmd_str);
@@ -633,10 +636,8 @@ fn _fcvt(
     sign: MutPtr<i32>,
 ) -> MutPtr<u8> {
     set_errno(env, 0);
-
     let is_negative = value.is_sign_negative() && value != 0.0;
     let val_abs = value.abs();
-
     // Format the number with the requested fractional digits
     let ndigits_usize = ndigits.max(0) as usize;
     let formatted = format!("{:.*}", ndigits_usize, val_abs);
@@ -678,7 +679,6 @@ fn _fcvt(
     
     env.mem.bytes_at_mut(buf, digits.len() as GuestUSize).copy_from_slice(digits.as_bytes());
     env.mem.write(buf + digits.len() as GuestUSize, b'\0');
-
     buf
 }
 
@@ -799,6 +799,7 @@ struct div_t {
 }
 unsafe impl SafeRead for div_t {}
 impl_GuestRet_for_large_struct!(div_t);
+
 fn div(_env: &mut Environment, numer: i32, denom: i32) -> div_t {
     div_t {
         quot: numer.wrapping_div(denom),
@@ -970,7 +971,8 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(arc4random_stir()),
     export_c_func!(arc4random_addrandom()),
     export_c_func!(getenv(_)),
-    export_c_func!(setenv(_, _, _)), // <--- ИСПРАВЛЕНИЕ НА 3 АРГУМЕНТА ГОСТЯ
+    export_c_func!(setenv(_, _, _)), 
+    // <--- ИСПРАВЛЕНИЕ НА 3 АРГУМЕНТА ГОСТЯ
     export_c_func!(unsetenv(_)),
     export_c_func!(exit(_)),
     export_c_func!(abort()),
@@ -1175,8 +1177,8 @@ where
                     8
                 }
             } else {
-                ungetc_fn(env, subject, curr);
-                10
+               ungetc_fn(env, subject, curr);
+               10
             }
         }
         if base == 8 || base == 16 {

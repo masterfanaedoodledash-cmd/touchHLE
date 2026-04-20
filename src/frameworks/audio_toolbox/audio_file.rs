@@ -1,13 +1,13 @@
 /*
- * This Source Code Form is subject to the terms of the Mozilla Public
+ * Эта лицензия Source Code Form подпадает под условия Mozilla Public
  * License, v. 2.0.
- * If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Если копия MPL не распространялась вместе с этим
+ * файлом, вы можете получить ее на https://mozilla.org/MPL/2.0/.
  */
 //! `AudioFile.h` (Audio File Services)
 
 use crate::abi::{CallFromHost, GuestFunction};
-use crate::audio; // Keep this module namespaced to avoid confusion
+use crate::audio; // Избегаем путаницы имен
 use crate::audio::AudioDescription;
 use crate::dyld::{export_c_func, FunctionExports};
 use crate::frameworks::carbon_core::{eofErr, paramErr, OSStatus};
@@ -62,8 +62,8 @@ unsafe impl SafeRead for AudioFilePacketTableInfo {}
 #[allow(dead_code)]
 const kAudioFileFileNotFoundError: OSStatus = -43;
 const kAudioFileNotOpenError: OSStatus = -38;
-const kAudioFileSuccess: OSStatus = 0; // ИСПРАВЛЕНО: Apple success code
-const kAudioFileBadPropertySizeError: OSStatus = fourcc(b"!siz") as _;
+const kAudioFileSuccess: OSStatus = 0; // Apple код успеха
+pub const kAudioFileBadPropertySizeError: OSStatus = fourcc(b"!siz") as _;
 const kAudioFileUnsupportedPropertyError: OSStatus = fourcc(b"pty?") as _;
 const kAudioFileUnsupportedFileTypeError: OSStatus = fourcc(b"typ?") as _;
 const kAudioFileUnspecifiedError: OSStatus = fourcc(b"wht?") as _;
@@ -119,11 +119,11 @@ pub fn AudioFileOpenURL(
     return_if_null!(in_file_ref);
 
     if in_permissions != kAudioFileReadPermission {
-        log!("Warning: AudioFileOpenURL() called with non-read permissions ({})", in_permissions);
+        log!("Внимание: AudioFileOpenURL() вызван с правами, отличными от чтения ({})", in_permissions);
     }
 
     if in_file_type_hint != 0 && in_file_type_hint != kAudioFileCAFType {
-        log!("Ignoring unknown file type hint {} for AudioFileOpenURL()", debug_fourcc(in_file_type_hint));
+        log!("Игнорируем неизвестный тип файла {} для AudioFileOpenURL()", debug_fourcc(in_file_type_hint));
     }
 
     let path = to_rust_path(env, in_file_ref);
@@ -131,7 +131,7 @@ pub fn AudioFileOpenURL(
         Ok(audio_file) => AudioFileHostObject::Real(audio_file),
         Err(error) => {
             log!(
-                "Warning: AudioFileOpenURL() for path {:?} failed: {:?}. Substituting 2-sec Dummy AudioFileHostObject.",
+                "Внимание: AudioFileOpenURL() для пути {:?} завершился ошибкой: {:?}. Подставляем 2-секундный Dummy AudioFileHostObject.",
                 path, error
             );
             create_dummy_audio_file()
@@ -148,7 +148,7 @@ pub fn AudioFileOpenURL(
         env.mem.write(out_audio_file, guest_audio_file);
     }
 
-    log_dbg!("AudioFileOpenURL() opened, new audio file handle: {:?}", guest_audio_file);
+    log_dbg!("AudioFileOpenURL() успешно открыт, новый хэндл аудиофайла: {:?}", guest_audio_file);
     kAudioFileSuccess
 }
 
@@ -163,7 +163,7 @@ pub fn AudioFileOpenWithCallbacks(
     out_audio_file: MutPtr<AudioFileID>,
 ) -> OSStatus {
     if _write_callback.to_ptr().is_null() || _setsize_callback.to_ptr().is_null() {
-        log_dbg!("AudioFileOpenWithCallbacks() called with write/set_size callbacks");
+        log_dbg!("AudioFileOpenWithCallbacks() вызван с write/set_size коллбэками (не поддерживается)");
     }
     
     let size: i64 = getsize_callback.call_from_host(env, (client_data,));
@@ -192,7 +192,7 @@ pub fn AudioFileOpenWithCallbacks(
     let host_object = match audio::AudioFile::read_from_vec(data_vec) {
         Ok(file) => AudioFileHostObject::Real(file),
         Err(_) => {
-            log!("Warning: AudioFileOpenWithCallbacks() failed parse. Substituting Dummy AudioFileHostObject.");
+            log!("Внимание: Ошибка парсинга в AudioFileOpenWithCallbacks(). Подставляем Dummy AudioFileHostObject.");
             create_dummy_audio_file()
         }
     };
@@ -207,7 +207,7 @@ pub fn AudioFileOpenWithCallbacks(
     kAudioFileSuccess
 }
 
-fn property_size(property_id: AudioFilePropertyID) -> GuestUSize {
+pub(super) fn property_size(property_id: AudioFilePropertyID) -> GuestUSize {
     match property_id {
         kAudioFilePropertyDataFormat => guest_size_of::<AudioStreamBasicDescription>(),
         kAudioFilePropertyAudioDataByteCount => guest_size_of::<u64>(),
@@ -267,7 +267,7 @@ pub fn AudioFileGetProperty(
     
     let provided_size = env.mem.read(io_data_size);
     if provided_size < required_size {
-        log!("Warning: AudioFileGetProperty() provided size {} < required {}", provided_size, required_size);
+        log!("Внимание: AudioFileGetProperty() переданный размер {} < требуемого {}", provided_size, required_size);
         return kAudioFileBadPropertySizeError;
     }
 
@@ -365,7 +365,7 @@ pub fn AudioFileGetProperty(
     kAudioFileSuccess
 }
 
-fn AudioFileReadBytes(
+pub fn AudioFileReadBytes(
     env: &mut Environment,
     in_audio_file: AudioFileID,
     _in_use_cache: bool,
@@ -434,10 +434,10 @@ pub fn AudioFileReadPackets(
     if io_num_packets.is_null() { return paramErr; }
 
     // Логирование из оригинала:
-    // Variable-size packets are not implemented currently. When they are,
-    // this parameter should be a `MutPtr<AudioStreamPacketDescription>`.
+    // Пакеты переменного размера на данный момент не реализованы. Когда они будут реализованы,
+    // этот параметр должен стать `MutPtr<AudioStreamPacketDescription>`.
     if !out_packet_descriptions.is_null() {
-        log!("Warning: ignoring non-null out_packet_descriptions in AudioFileReadPackets()");
+        log!("Внимание: игнорирование не-null out_packet_descriptions в AudioFileReadPackets()");
     }
 
     let host_object = match State::get(&mut env.framework_state).audio_files.get_mut(&in_audio_file) {
@@ -500,13 +500,12 @@ pub fn AudioFileReadPackets(
 pub fn AudioFileClose(env: &mut Environment, in_audio_file: AudioFileID) -> OSStatus {
     return_if_null!(in_audio_file);
     let Some(_host_object) = State::get(&mut env.framework_state).audio_files.remove(&in_audio_file) else {
-        log!("Bad AudioFileClose for {:?} (likely double close), ignoring!", in_audio_file);
+        log!("Ошибка при AudioFileClose для {:?} (вероятно, двойное закрытие), игнорируем!", in_audio_file);
         return kAudioFileUnspecifiedError;
     };
     env.mem.free(in_audio_file.cast());
     
-    // Логирование из оригинала
-    log_dbg!("AudioFileClose() destroyed audio file handle: {:?}", in_audio_file);
+    log_dbg!("AudioFileClose() уничтожен хэндл аудиофайла: {:?}", in_audio_file);
     
     kAudioFileSuccess
 }
@@ -519,13 +518,13 @@ fn AudioFileStreamOpen(
     _in_file_type_hint: AudioFileTypeID,
     _out_audio_file_stream: MutVoidPtr,
 ) -> OSStatus {
-    log!("TODO: AudioFileStreamOpen(), returning kAudioFileUnspecifiedError!");
+    log!("TODO (задача): AudioFileStreamOpen(), возвращаем kAudioFileUnspecifiedError!");
     kAudioFileUnspecifiedError
 }
 
 pub fn AudioFormatGetPropertyInfo(
     _env: &mut Environment,
-    property_id: AudioFilePropertyID,
+    _property_id: AudioFilePropertyID,
     _specifier_size: u32,
     _specifier: crate::mem::ConstPtr<u8>,
     _out_property_data_size: MutPtr<u32>,

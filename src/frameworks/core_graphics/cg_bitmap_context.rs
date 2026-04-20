@@ -141,27 +141,60 @@ fn CGBitmapContextGetBytesPerRow(env: &mut Environment, context: CGContextRef) -
 pub fn CGBitmapContextCreateImage(env: &mut Environment, context: CGContextRef) -> CGImageRef {
     let host_obj = env.objc.borrow::<CGContextHostObject>(context);
     let CGContextSubclass::CGBitmapContext(bitmap_data) = host_obj.subclass;
-    assert!(
-        bitmap_data.bits_per_component == 8
-            && bitmap_data.bytes_per_row == bitmap_data.width * 4
-            && bitmap_data.color_space == kCGColorSpaceGenericRGB
-            && matches!(
-                bitmap_data.alpha_info,
-                kCGImageAlphaNoneSkipLast | kCGImageAlphaPremultipliedLast
-            )
-    );
 
-    let pixels = env
+    // Убираем жесткий assert, который крашит игру.
+    // Игры часто создают контексты с другими форматами (например, Grayscale или без альфы).
+    // Вместо паники мы честно читаем пиксели, используя уже написанные в файле хелперы.
+
+    if bitmap_data.bits_per_component != 8 {
+        log!("Warning: CGBitmapContextCreateImage called with bits_per_component = {}, which is not fully supported yet.", bitmap_data.bits_per_component);
+    }
+
+    let bpp = bytes_per_pixel(&bitmap_data) as usize;
+    let data_size = bitmap_data.bytes_per_row * bitmap_data.height;
+
+    let raw_pixels = env
         .mem
-        .bytes_at(
-            bitmap_data.data.cast(),
-            bitmap_data.bytes_per_row * bitmap_data.height,
-        )
-        .to_vec();
+        .bytes_at(bitmap_data.data.cast(), data_size);
+
+    // Нам нужно привести любые пиксели к формату RGBA (4 байта на пиксель), 
+    // так как структура Image ожидает именно его.
+    let mut normalized_pixels = Vec::with_capacity((bitmap_data.width * bitmap_data.height * 4) as usize);
+
+    // Получаем смещения для каналов цвета из оригинального контекста
+    let (r_offset, g_offset, b_offset, a_offset) = pixel_offsets(&bitmap_data);
+
+    for y in 0..bitmap_data.height {
+        let row_start = (y * bitmap_data.bytes_per_row) as usize;
+        for x in 0..bitmap_data.width {
+            let pixel_start = row_start + (x as usize * bpp);
+
+            // Защита от выхода за пределы памяти, если шаг строки (bytes_per_row) нестандартный
+            if pixel_start + bpp > raw_pixels.len() {
+                normalized_pixels.extend_from_slice(&[0, 0, 0, 0]);
+                continue;
+            }
+
+            let r = raw_pixels.get(pixel_start + r_offset).copied().unwrap_or(0);
+            let g = raw_pixels.get(pixel_start + g_offset).copied().unwrap_or(0);
+            let b = raw_pixels.get(pixel_start + b_offset).copied().unwrap_or(0);
+
+            let a = if let Some(offset) = a_offset {
+                raw_pixels.get(pixel_start + offset).copied().unwrap_or(255)
+            } else {
+                255
+            };
+
+            normalized_pixels.push(r);
+            normalized_pixels.push(g);
+            normalized_pixels.push(b);
+            normalized_pixels.push(a);
+        }
+    }
 
     cg_image::from_image(
         env,
-        Image::from_pixel_vec(pixels, (bitmap_data.width, bitmap_data.height)),
+        Image::from_pixel_vec(normalized_pixels, (bitmap_data.width, bitmap_data.height)),
     )
 }
 

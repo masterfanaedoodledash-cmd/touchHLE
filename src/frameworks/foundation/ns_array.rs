@@ -358,7 +358,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 
     if env.objc.class_is_subclass_of(class, keyed_arch_class) {
         let array = env.objc.borrow::<ArrayHostObject>(this).array.clone();
-
         // NSKeyedArchiver stores arrays as NS.objects.0, NS.objects.1 ...
         for (i, obj) in array.iter().copied().enumerate() {
             let key = from_rust_string(env, format!("NS.objects.{}", i));
@@ -620,16 +619,16 @@ pub const CLASSES: ClassExports = objc_classes! {
     // arrays though (maybe it's `decodeObjectForKey:`), and in any case
     // allocating an NSString here would be inconvenient, so let's just take a
     // shortcut.
-        ns_keyed_unarchiver::decode_current_array(env, coder)
+    ns_keyed_unarchiver::decode_current_array(env, coder)
     } else if env.objc.class_is_subclass_of(class, nib_archive_class) {
         _nib_archive_decoder::decode_current_array(env, coder)
     } else {
         unimplemented!()
     };
-
     let host_object: &mut ArrayHostObject = env.objc.borrow_mut(this);
     assert!(host_object.array.is_empty());
-    host_object.array = objects; // objects are already retained
+    host_object.array = objects;
+    // objects are already retained
     this
 }
 
@@ -678,7 +677,6 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (())dealloc {
     let host_object: &mut ArrayHostObject = env.objc.borrow_mut(this);
     let array = std::mem::take(&mut host_object.array);
-
     for object in array {
         release(env, object);
     }
@@ -718,7 +716,11 @@ pub const CLASSES: ClassExports = objc_classes! {
     env.objc.borrow::<ArrayHostObject>(this).array.len().try_into().unwrap()
 }
 - (id)objectAtIndex:(NSUInteger)index {
-    // TODO: throw real exception rather than panic if out-of-bounds?
+    let len = env.objc.borrow::<ArrayHostObject>(this).array.len();
+    if index as usize >= len {
+        log!("Warning: NSArray objectAtIndex: index out of bounds (index {}, len {})", index, len);
+        return nil;
+    }
     env.objc.borrow::<ArrayHostObject>(this).array[index as usize]
 }
 
@@ -847,10 +849,10 @@ pub const CLASSES: ClassExports = objc_classes! {
     } else {
         unimplemented!()
     };
-
     let host_object: &mut ArrayHostObject = env.objc.borrow_mut(this);
     assert!(host_object.array.is_empty());
-    host_object.array = objects; // objects are already retained
+    host_object.array = objects;
+    // objects are already retained
     this
 }
 
@@ -936,7 +938,6 @@ pub const CLASSES: ClassExports = objc_classes! {
             array.swap(l, r);
         },
     );
-
     let (env, _) = user_data;
     env.objc.borrow_mut::<ArrayHostObject>(this).array = array;
 }
@@ -959,8 +960,13 @@ pub const CLASSES: ClassExports = objc_classes! {
 - (NSUInteger)count {
     env.objc.borrow::<ArrayHostObject>(this).array.len().try_into().unwrap()
 }
+
 - (id)objectAtIndex:(NSUInteger)index {
-    // TODO: throw real exception rather than panic if out-of-bounds?
+    let len = env.objc.borrow::<ArrayHostObject>(this).array.len();
+    if index as usize >= len {
+        log!("Warning: NSMutableArray objectAtIndex: index out of bounds (index {}, len {})", index, len);
+        return nil;
+    }
     env.objc.borrow::<ArrayHostObject>(this).array[index as usize]
 }
 
@@ -972,6 +978,11 @@ pub const CLASSES: ClassExports = objc_classes! {
 
 - (())insertObject:(id)object
            atIndex:(NSUInteger)index {
+    let len = env.objc.borrow::<ArrayHostObject>(this).array.len();
+    if index as usize > len {
+        log!("Warning: NSMutableArray insertObject:atIndex: index out of bounds");
+        return;
+    }
     retain(env, object);
     env.objc.borrow_mut::<ArrayHostObject>(this).array.insert(index as usize, object);
 }
@@ -998,19 +1009,33 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())removeObjectAtIndex:(NSUInteger)index {
+    let len = env.objc.borrow::<ArrayHostObject>(this).array.len();
+    if index as usize >= len {
+        log!("Warning: NSMutableArray removeObjectAtIndex: index out of bounds");
+        return;
+    }
     let object = env.objc.borrow_mut::<ArrayHostObject>(this).array.remove(index as usize);
     release(env, object)
 }
 
 - (())replaceObjectAtIndex:(NSUInteger)index withObject:(id)obj {
+    let len = env.objc.borrow::<ArrayHostObject>(this).array.len();
+    if index as usize >= len {
+        log!("Warning: NSMutableArray replaceObjectAtIndex:withObject: index out of bounds");
+        return;
+    }
     retain(env, obj);
     let object = std::mem::replace(&mut env.objc.borrow_mut::<ArrayHostObject>(this).array[index as usize], obj);
     release(env, object);
 }
 
 - (())removeLastObject {
-    let object = env.objc.borrow_mut::<ArrayHostObject>(this).array.pop().unwrap();
-    release(env, object)
+    let object_opt = env.objc.borrow_mut::<ArrayHostObject>(this).array.pop();
+    if let Some(object) = object_opt {
+        release(env, object)
+    } else {
+        log!("Warning: NSMutableArray removeLastObject: array is empty");
+    }
 }
 
 - (())removeAllObjects {
@@ -1038,17 +1063,24 @@ pub const CLASSES: ClassExports = objc_classes! {
 }
 
 - (())removeObjectAtIndex:(NSUInteger)index {
+    let len = env.objc.borrow::<ArrayHostObject>(this).array.len();
+    if index as usize >= len {
+        log!("Warning: NSMutableArray_non_retaining removeObjectAtIndex: index out of bounds");
+        return;
+    }
     env.objc.borrow_mut::<ArrayHostObject>(this).array.remove(index as usize);
 }
 
 - (())removeLastObject {
-    env.objc.borrow_mut::<ArrayHostObject>(this).array.pop().unwrap();
+    let popped = env.objc.borrow_mut::<ArrayHostObject>(this).array.pop();
+    if popped.is_none() {
+        log!("Warning: NSMutableArray_non_retaining removeLastObject: array is empty");
+    }
 }
 
 @end
 
 };
-
 /// Shortcut for host code, roughly equivalent to
 /// `[[NSArray alloc] initWithObjects:count]` but without copying.
 /// The elements should already be "retained by" the `Vec`.
@@ -1135,3 +1167,4 @@ fn mutable_copy_inner(env: &mut Environment, arr: id) -> id {
     env.objc.borrow_mut::<ArrayHostObject>(mut_arr).array = array;
     mut_arr
 }
+

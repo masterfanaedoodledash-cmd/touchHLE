@@ -354,6 +354,17 @@ pub fn AudioQueueSetParameter(
     0 // success
 }
 
+pub fn AudioQueueSetOfflineRenderFormat(
+    _env: &mut Environment,
+    in_aq: AudioQueueRef,
+    _in_format: ConstPtr<AudioStreamBasicDescription>,
+    _in_layout: ConstVoidPtr,
+) -> OSStatus {
+    return_if_null!(in_aq);
+    log!("TODO: AudioQueueSetOfflineRenderFormat UNIMPLEMENTED");
+    0 // success (noErr)
+}
+
 fn AudioQueueAllocateBufferWithPacketDescriptions(
     env: &mut Environment,
     in_aq: AudioQueueRef,
@@ -1414,5 +1425,5 @@ pub const FUNCTIONS: FunctionExports = &[
     export_c_func!(AudioQueueDisposeTimeline(_, _)),
     export_c_func!(AudioQueueGetCurrentTime(_, _, _, _)),
     export_c_func!(AudioQueueDeviceGetCurrentTime(_, _)),
+    export_c_func!(AudioQueueSetOfflineRenderFormat(_, _, _)), // Экспортируем новую функцию здесь!
 ];
-
