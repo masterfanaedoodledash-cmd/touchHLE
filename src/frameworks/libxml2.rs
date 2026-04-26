@@ -5,7 +5,7 @@
 //! handles.  Only returned xmlChar* strings are allocated in
 //! guest memory.
 
-use crate::dyld::{export_c_func, ConstantExports, FunctionExports, HostConstant};
+use crate::dyld::{export_c_func, ConstantExports, FunctionExports};
 use crate::fs::GuestPath;
 use crate::mem::{GuestUSize, MutPtr, Ptr};
 use crate::Environment;
@@ -16,7 +16,7 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
     path: "/usr/lib/libxml2.2.dylib",
     aliases: &["/usr/lib/libxml2.dylib"],
     class_exports: &[],
-    constant_exports: &[CONSTANTS],
+    constant_exports: &[],
     function_exports: &[FUNCTIONS],
 };
 
@@ -78,11 +78,6 @@ const FUNCTIONS: FunctionExports = &[
     export_c_func!(xmlStrdup(_)),
     export_c_func!(xmlStrlen(_)),
     export_c_func!(xmlStrsub(_, _, _)),
-];
-
-pub const CONSTANTS: ConstantExports = &[
-    ("_xmlIndentTreeOutput", HostConstant::NullPtr),
-    ("_xmlSaveNoEmptyTags", HostConstant::NullPtr),
 ];
 
 // ============================================================

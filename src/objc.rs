@@ -134,7 +134,6 @@ const CONSTANTS: ConstantExports = &[
     ("_NSHTTPCookieValue", HostConstant::NSString("NSHTTPCookieValue")),
     ("_NSHTTPCookieName", HostConstant::NSString("NSHTTPCookieName")),
     ("_NSHTTPCookiePath", HostConstant::NSString("NSHTTPCookiePath")),
-    ("_NSKeyValueChangeNewKey", HostConstant::NSString("new")),
 ];
 
 /// Block support is iOS 4+, but it seems like Block Runtime Helpers

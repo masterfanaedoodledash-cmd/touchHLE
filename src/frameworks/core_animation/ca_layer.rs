@@ -83,12 +83,10 @@ impl CALayerHostObject {
 pub const kCAFilterLinear: &str = "kCAFilterLinear";
 pub const kCAFilterNearest: &str = "kCAFilterNearest";
 pub const kCAFilterTrilinear: &str = "kCAFilterTrilinear";
-pub const kCAGravityCenter: &str = "center";
 pub const CONSTANTS: ConstantExports = &[
     ("_kCAFilterLinear", HostConstant::NSString(kCAFilterLinear)),
     ("_kCAFilterNearest", HostConstant::NSString(kCAFilterNearest)),
     ("_kCAFilterTrilinear", HostConstant::NSString(kCAFilterTrilinear)),
-    ("_kCAGravityCenter", HostConstant::NSString(kCAGravityCenter)),
 ];
 pub const CLASSES: ClassExports = objc_classes! {
 
@@ -542,3 +540,4 @@ fn transform_for_conversion(env: &mut Environment, this: id, other: id) -> CGAff
     assert!((common_ancestor == nil) != need_common_ancestor);
     other_transform.concat(this_transform.invert())
 }
+
