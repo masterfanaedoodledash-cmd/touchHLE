@@ -15,6 +15,7 @@ use std::time::Instant;
 use crate::dyld::HostConstant;
 use crate::mem::{ConstVoidPtr, MutPtr};
 
+pub mod tw_tweet_compose_view_controller;
 pub mod ui_accelerometer;
 pub mod ui_action_sheet;
 pub mod ui_activity_indicator_view;
@@ -137,6 +138,7 @@ pub const DYLIB: crate::dyld::HostDylib = crate::dyld::HostDylib {
     path: "/System/Library/Frameworks/UIKit.framework/UIKit",
     aliases: &[],
     class_exports: &[
+        tw_tweet_compose_view_controller::CLASSES,
         ui_accelerometer::CLASSES,
         ui_action_sheet::CLASSES,
         ui_activity_indicator_view::CLASSES,
