@@ -54,7 +54,6 @@ pub mod opengles;
 pub mod security;
 pub mod store_kit;
 pub mod system_configuration;
-pub mod tw_tweet_compose_view_controller;
 pub mod uikit;
 
 /// Container for state of various child modules
